@@ -110,6 +110,7 @@ public class GraphiteMetricsConsumer implements IMetricsConsumer {
     }
   }
 
+  // TODO Handle Clojure map that gets passed in for __recv-iconnection{enqueued, pending, dequeuedMessages} metrics
   @Override @SuppressWarnings("unchecked")
   public void handleDataPoints(TaskInfo taskInfo, Collection<DataPoint> dataPoints) {
     graphiteConnect();
@@ -135,6 +136,7 @@ public class GraphiteMetricsConsumer implements IMetricsConsumer {
         sendToGraphite(prefixedMetricPath, value, taskInfo.timestamp);
       }
     }
+    flush();
     graphiteDisconnect();
   }
 
@@ -162,9 +164,15 @@ public class GraphiteMetricsConsumer implements IMetricsConsumer {
   }
 
   protected void sendToGraphite(String metricPath, String value, long timestamp) {
+    if (graphite != null) {
+      graphite.appendToSendBuffer(metricPath, value, timestamp);
+    }
+  }
+
+  protected void flush() {
     try {
       if (graphite != null) {
-        graphite.send(metricPath, value, timestamp);
+        graphite.flushSendBuffer();
       }
     }
     catch (IOException e) {

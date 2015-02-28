@@ -64,22 +64,39 @@ public class GraphiteAdapter {
     }
   }
 
-  public void send(String metricPath, String value, long timestamp) throws IOException {
+  public void appendToSendBuffer(String metricPath, String value, long timestamp) {
     try {
       graphite.send(metricPath, value, timestamp);
     }
     catch (IOException e) {
-      handleFailedSend(metricPath, value, timestamp, e);
+      handleFailedAppend(metricPath, value, timestamp, e);
     }
     catch (NullPointerException npe) {
-      handleFailedSend(metricPath, value, timestamp, npe);
+      handleFailedAppend(metricPath, value, timestamp, npe);
     }
   }
 
-  private void handleFailedSend(String metricPath, String value, long timestamp, Exception e) {
+  private void handleFailedAppend(String metricPath, String value, long timestamp, Exception e) {
     String trace = Throwables.getStackTraceAsString(e);
     String update = updateToString(metricPath, value, timestamp);
-    LOG.error("Failed to send '" + update + "' to " + serverFingerprint() + ": " + e.getMessage() + "\n" + trace);
+    LOG.error("Failed to append '" + update + "' to send buffer:" + e.getMessage() + "\n" + trace);
+  }
+  
+  public void flushSendBuffer() throws IOException {
+    try {
+      graphite.flush();
+    }
+    catch (IOException e) {
+      handleFailedFlush(e);
+    }
+    catch (NullPointerException npe) {
+      handleFailedFlush(npe);
+    }
+  }
+
+  private void handleFailedFlush(Exception e) {
+    String trace = Throwables.getStackTraceAsString(e);
+    LOG.error("Failed to send update to " + serverFingerprint() + ": " + e.getMessage() + "\n" + trace);
     if((System.currentTimeMillis() - lastConnectAttemptTimestamp) > MIN_CONNECT_ATTEMPT_INTERVAL_SECS) {
       try {
         this.disconnect();
