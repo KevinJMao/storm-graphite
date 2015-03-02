@@ -66,35 +66,35 @@ public class GraphiteAdapter {
 
   public void appendToSendBuffer(String metricPath, String value, long timestamp) {
     try {
+      if(!graphite.isConnected()) {
+        graphite.connect();
+      }
       graphite.send(metricPath, value, timestamp);
     }
     catch (IOException e) {
-      handleFailedAppend(metricPath, value, timestamp, e);
+      handleFailedSend(e);
     }
     catch (NullPointerException npe) {
-      handleFailedAppend(metricPath, value, timestamp, npe);
+      handleFailedSend(npe);
     }
   }
 
-  private void handleFailedAppend(String metricPath, String value, long timestamp, Exception e) {
-    String trace = Throwables.getStackTraceAsString(e);
-    String update = updateToString(metricPath, value, timestamp);
-    LOG.error("Failed to append '" + update + "' to send buffer:" + e.getMessage() + "\n" + trace);
-  }
-  
   public void flushSendBuffer() throws IOException {
     try {
+      if(!graphite.isConnected()) {
+        graphite.connect();
+      }
       graphite.flush();
     }
     catch (IOException e) {
-      handleFailedFlush(e);
+      handleFailedSend(e);
     }
     catch (NullPointerException npe) {
-      handleFailedFlush(npe);
+      handleFailedSend(npe);
     }
   }
 
-  private void handleFailedFlush(Exception e) {
+  private void handleFailedSend(Exception e) {
     String trace = Throwables.getStackTraceAsString(e);
     LOG.error("Failed to send update to " + serverFingerprint() + ": " + e.getMessage() + "\n" + trace);
     if((System.currentTimeMillis() - lastConnectAttemptTimestamp) > MIN_CONNECT_ATTEMPT_INTERVAL_SECS) {
@@ -109,10 +109,6 @@ public class GraphiteAdapter {
     else {
       LOG.warn("Connection attempt limit exceeded to Carbon daemon running at " + serverFingerprint());
     }
-  }
-
-  private String updateToString(String metricPath, String value, long timestamp) {
-    return metricPath + " " + value + " " + timestamp;
   }
 
   public String serverFingerprint() {
